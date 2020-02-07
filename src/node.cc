@@ -1043,7 +1043,11 @@ InitializationResult InitializeOncePerProcess(int argc, char** argv) {
   // In the case of FIPS builds we should make sure
   // the random source is properly initialized first.
   if (FIPS_mode()) {
-    OPENSSL_init();
+    #ifdef OPENSSL_IS_BORINGSSL
+      SSL_library_init();
+    #else
+      OPENSSL_init();
+    #endif
   }
   // V8 on Windows doesn't have a good source of entropy. Seed it from
   // OpenSSL's pool.
