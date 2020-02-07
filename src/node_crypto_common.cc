@@ -238,6 +238,7 @@ int UseSNIContext(const SSLPointer& ssl, BaseObjectPtr<SecureContext> context) {
   return err;
 }
 
+#ifndef OPENSSL_IS_BORINGSSL
 const char* GetClientHelloALPN(const SSLPointer& ssl) {
   const unsigned char* buf;
   size_t len;
@@ -284,14 +285,17 @@ const char* GetClientHelloServerName(const SSLPointer& ssl) {
     return nullptr;
   return reinterpret_cast<const char*>(buf + 5);
 }
+#endif
 
 const char* GetServerName(SSL* ssl) {
   return SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 }
 
+#ifndef OPENSSL_IS_BORINGSSL
 bool SetGroups(SecureContext* sc, const char* groups) {
   return SSL_CTX_set1_groups_list(**sc, groups) == 1;
 }
+#endif
 
 const char* X509ErrorCode(long err) {  // NOLINT(runtime/int)
   const char* code = "UNSPECIFIED";
@@ -768,6 +772,7 @@ MaybeLocal<Value> GetCipherVersion(Environment* env, const SSLPointer& ssl) {
   return GetCipherVersion(env, SSL_get_current_cipher(ssl.get()));
 }
 
+#ifndef OPENSSL_IS_BORINGSSL
 MaybeLocal<Array> GetClientHelloCiphers(
     Environment* env,
     const SSLPointer& ssl) {
@@ -800,7 +805,7 @@ MaybeLocal<Array> GetClientHelloCiphers(
   Local<Array> ret = Array::New(env->isolate(), ciphers.out(), count);
   return scope.Escape(ret);
 }
-
+#endif
 
 MaybeLocal<Object> GetCipherInfo(Environment* env, const SSLPointer& ssl) {
   EscapableHandleScope scope(env->isolate());
