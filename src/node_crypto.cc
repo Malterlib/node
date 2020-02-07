@@ -248,6 +248,41 @@ Maybe<bool> Decorate(Environment* env, Local<Object> obj,
         c = ToUpper(c);
     }
 
+#ifdef OPENSSL_IS_BORINGSSL
+#define OSSL_ERROR_CODES_MAP(V)                                               \
+    V(SYS)                                                                    \
+    V(BN)                                                                     \
+    V(RSA)                                                                    \
+    V(DH)                                                                     \
+    V(EVP)                                                                    \
+    V(BUF)                                                                    \
+    V(OBJ)                                                                    \
+    V(PEM)                                                                    \
+    V(DSA)                                                                    \
+    V(X509)                                                                   \
+    V(ASN1)                                                                   \
+    V(CONF)                                                                   \
+    V(CRYPTO)                                                                 \
+    V(EC)                                                                     \
+    V(SSL)                                                                    \
+    V(BIO)                                                                    \
+    V(PKCS7)                                                                  \
+    V(PKCS8)                                                                  \
+    V(X509V3)                                                                 \
+    V(RAND)                                                                   \
+    V(ENGINE)                                                                 \
+    V(OCSP)                                                                   \
+    V(UI)                                                                     \
+    V(COMP)                                                                   \
+    V(ECDSA)                                                                  \
+    V(ECDH)                                                                   \
+    V(HMAC)                                                                   \
+    V(DIGEST)                                                                 \
+    V(CIPHER)                                                                 \
+    V(HKDF)                                                                   \
+    V(USER)                                                                   \
+
+#else
 #define OSSL_ERROR_CODES_MAP(V)                                               \
     V(SYS)                                                                    \
     V(BN)                                                                     \
@@ -286,6 +321,8 @@ Maybe<bool> Decorate(Environment* env, Local<Object> obj,
     V(KDF)                                                                    \
     V(SM2)                                                                    \
     V(USER)                                                                   \
+
+#endif
 
 #define V(name) case ERR_LIB_##name: lib = #name "_"; break;
     const char* lib = "";
@@ -1206,7 +1243,7 @@ static void set_settings_from_certificate(Environment* env, SSL_CTX* const conte
             SSL_CTX_set_options(context, SSL_OP_SINGLE_ECDH_USE);
             if (SSL_CTX_set_tmp_ecdh(context, curveKey) != 1)
                 SSL_CTX_set_ecdh_auto(context, 1);
-            EC_KEY_free(curveKey);     
+            EC_KEY_free(curveKey);
         } else
             SSL_CTX_set_ecdh_auto(context, 1);
     }
@@ -1219,8 +1256,8 @@ static void set_settings_from_certificate(Environment* env, SSL_CTX* const conte
 #endif
         , NID_X9_62_prime256v1
     };
-    
-    if (!SSL_CTX_set1_curves(context, supportedCurves, sizeof(supportedCurves) 
+
+    if (!SSL_CTX_set1_curves(context, supportedCurves, sizeof(supportedCurves)
         / sizeof(supportedCurves[0]))) {
         return env->ThrowError("Failed to set supported curves on ssl context");
     }
@@ -1239,14 +1276,14 @@ static void set_settings_from_certificate(Environment* env, SSL_CTX* const conte
     };
 
     size_t num_algos = sizeof(s_DefaultAlgos) / sizeof(s_DefaultAlgos[0]);
-    const uint16_t *algos = s_DefaultAlgos; 
+    const uint16_t *algos = s_DefaultAlgos;
 
     switch (curveName)
     {
     case NID_secp521r1: break;
     case NID_secp384r1:
         {
-            static const uint16_t s_CustomAlgos[] = 
+            static const uint16_t s_CustomAlgos[] =
             {
                 SSL_SIGN_ECDSA_SECP384R1_SHA384
                 , SSL_SIGN_RSA_PSS_SHA384
@@ -1259,13 +1296,13 @@ static void set_settings_from_certificate(Environment* env, SSL_CTX* const conte
                 , SSL_SIGN_RSA_PKCS1_SHA256
             };
             num_algos = sizeof(s_CustomAlgos) / sizeof(s_CustomAlgos[0]);
-            algos = s_CustomAlgos; 
+            algos = s_CustomAlgos;
         }
         break;
     case NID_X9_62_prime256v1:
     case NID_X25519:
         {
-            static const uint16_t s_CustomAlgos[] = 
+            static const uint16_t s_CustomAlgos[] =
             {
                 SSL_SIGN_ECDSA_SECP256R1_SHA256
                 , SSL_SIGN_RSA_PSS_SHA256
@@ -1278,7 +1315,7 @@ static void set_settings_from_certificate(Environment* env, SSL_CTX* const conte
                 , SSL_SIGN_RSA_PKCS1_SHA512
             };
             num_algos = sizeof(s_CustomAlgos) / sizeof(s_CustomAlgos[0]);
-            algos = s_CustomAlgos; 
+            algos = s_CustomAlgos;
         }
         break;
     }
@@ -1306,7 +1343,7 @@ void SecureContext::SetECDHCurve(const FunctionCallbackInfo<Value>& args) {
   node::Utf8Value curve(env->isolate(), args[0]);
 
   if (strcmp(*curve, "from_certificate") == 0)
-    return set_settings_from_certificate(env, sc->ctx_);
+    return set_settings_from_certificate(env, sc->ctx_.get());
 
   if (strcmp(*curve, "auto") == 0)
     return;
@@ -5885,7 +5922,7 @@ void ECDH::SetPrivateKey(const FunctionCallbackInfo<Value>& args) {
   if (!EC_KEY_set_public_key(new_key.get(), pub.get()))
     return env->ThrowError("Failed to set generated public key");
 
-  EC_KEY_copy(ecdh->key_.get(), new_key.get());
+  ecdh->key_ = ECKeyPointer(EC_KEY_dup(new_key.get()));
   ecdh->group_ = EC_KEY_get0_group(ecdh->key_.get());
 }
 
@@ -6266,6 +6303,7 @@ class RSAPSSKeyPairGenerationConfig : public RSAKeyPairGenerationConfig {
   const int saltlen_;
 };
 
+#ifndef OPENSSL_IS_BORINGSSL
 class DSAKeyPairGenerationConfig : public KeyPairGenerationConfig {
  public:
   DSAKeyPairGenerationConfig(unsigned int modulus_bits, int divisor_bits)
@@ -6304,6 +6342,7 @@ class DSAKeyPairGenerationConfig : public KeyPairGenerationConfig {
   const unsigned int modulus_bits_;
   const int divisor_bits_;
 };
+#endif
 
 class ECKeyPairGenerationConfig : public KeyPairGenerationConfig {
  public:
@@ -6361,6 +6400,7 @@ struct PrimeInfo {
   unsigned int prime_size_;
 };
 
+#ifndef OPENSSL_IS_BORINGSSL
 class DHKeyPairGenerationConfig : public KeyPairGenerationConfig {
  public:
   explicit DHKeyPairGenerationConfig(PrimeInfo&& prime_info,
@@ -6416,6 +6456,7 @@ class DHKeyPairGenerationConfig : public KeyPairGenerationConfig {
   PrimeInfo prime_info_;
   unsigned int generator_;
 };
+#endif
 
 class GenerateKeyPairJob : public CryptoJob {
  public:
@@ -6595,6 +6636,7 @@ void GenerateKeyPairRSAPSS(const FunctionCallbackInfo<Value>& args) {
   GenerateKeyPair(args, 5, std::move(config));
 }
 
+#ifndef OPENSSL_IS_BORINGSSL
 void GenerateKeyPairDSA(const FunctionCallbackInfo<Value>& args) {
   CHECK(args[0]->IsUint32());
   const uint32_t modulus_bits = args[0].As<Uint32>()->Value();
@@ -6604,6 +6646,7 @@ void GenerateKeyPairDSA(const FunctionCallbackInfo<Value>& args) {
       new DSAKeyPairGenerationConfig(modulus_bits, divisor_bits));
   GenerateKeyPair(args, 2, std::move(config));
 }
+#endif
 
 void GenerateKeyPairEC(const FunctionCallbackInfo<Value>& args) {
   CHECK(args[0]->IsString());
@@ -6633,6 +6676,7 @@ void GenerateKeyPairNid(const FunctionCallbackInfo<Value>& args) {
   GenerateKeyPair(args, 1, std::move(config));
 }
 
+#ifndef OPENSSL_IS_BORINGSSL
 void GenerateKeyPairDH(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
@@ -6665,7 +6709,7 @@ void GenerateKeyPairDH(const FunctionCallbackInfo<Value>& args) {
       new DHKeyPairGenerationConfig(std::move(prime_info), generator));
   GenerateKeyPair(args, 2, std::move(config));
 }
-
+#endif
 
 void GetSSLCiphers(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
@@ -7133,10 +7177,14 @@ void Initialize(Local<Object> target,
   env->SetMethod(target, "pbkdf2", PBKDF2);
   env->SetMethod(target, "generateKeyPairRSA", GenerateKeyPairRSA);
   env->SetMethod(target, "generateKeyPairRSAPSS", GenerateKeyPairRSAPSS);
+#ifndef OPENSSL_IS_BORINGSSL
   env->SetMethod(target, "generateKeyPairDSA", GenerateKeyPairDSA);
+#endif
   env->SetMethod(target, "generateKeyPairEC", GenerateKeyPairEC);
   env->SetMethod(target, "generateKeyPairNid", GenerateKeyPairNid);
+#ifndef OPENSSL_IS_BORINGSSL
   env->SetMethod(target, "generateKeyPairDH", GenerateKeyPairDH);
+#endif
   NODE_DEFINE_CONSTANT(target, EVP_PKEY_ED25519);
   NODE_DEFINE_CONSTANT(target, EVP_PKEY_ED448);
   NODE_DEFINE_CONSTANT(target, EVP_PKEY_X25519);
