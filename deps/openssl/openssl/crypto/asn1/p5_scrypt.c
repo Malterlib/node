@@ -53,7 +53,7 @@ X509_ALGOR *PKCS5_pbe2_set_scrypt(const EVP_CIPHER *cipher,
         goto err;
     }
 
-    if (EVP_PBE_scrypt(NULL, 0, NULL, 0, N, r, p, 0, NULL, 0) == 0) {
+    if (EVP_PBE_scrypt_SHA256(NULL, 0, NULL, 0, N, r, p, 0, NULL, 0) == 0) {
         ASN1err(ASN1_F_PKCS5_PBE2_SET_SCRYPT,
                 ASN1_R_INVALID_SCRYPT_PARAMETERS);
         goto err;
@@ -251,7 +251,7 @@ int PKCS5_v2_scrypt_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass,
     if (ASN1_INTEGER_get_uint64(&N, sparam->costParameter) == 0
         || ASN1_INTEGER_get_uint64(&r, sparam->blockSize) == 0
         || ASN1_INTEGER_get_uint64(&p, sparam->parallelizationParameter) == 0
-        || EVP_PBE_scrypt(NULL, 0, NULL, 0, N, r, p, 0, NULL, 0) == 0) {
+        || EVP_PBE_scrypt_SHA256(NULL, 0, NULL, 0, N, r, p, 0, NULL, 0) == 0) {
         EVPerr(EVP_F_PKCS5_V2_SCRYPT_KEYIVGEN,
                EVP_R_ILLEGAL_SCRYPT_PARAMETERS);
         goto err;
@@ -261,7 +261,7 @@ int PKCS5_v2_scrypt_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass,
 
     salt = sparam->salt->data;
     saltlen = sparam->salt->length;
-    if (EVP_PBE_scrypt(pass, passlen, salt, saltlen, N, r, p, 0, key, keylen)
+    if (EVP_PBE_scrypt_SHA256(pass, passlen, salt, saltlen, N, r, p, 0, key, keylen)
         == 0)
         goto err;
     rv = EVP_CipherInit_ex(ctx, NULL, NULL, key, NULL, en_de);
