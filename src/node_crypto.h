@@ -41,6 +41,7 @@
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #include <openssl/rsa.h>
+#include <openssl/hmac.h>
 
 namespace node {
 namespace crypto {
