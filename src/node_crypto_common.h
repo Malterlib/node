@@ -74,17 +74,21 @@ long VerifyPeerCertificate(  // NOLINT(runtime/int)
 
 int UseSNIContext(const SSLPointer& ssl, SecureContext* context);
 
+#ifndef OPENSSL_IS_BORINGSSL
 const char* GetClientHelloALPN(const SSLPointer& ssl);
 
 const char* GetClientHelloServerName(const SSLPointer& ssl);
+#endif
 
 const char* GetServerName(SSL* ssl);
 
+#ifndef OPENSSL_IS_BORINGSSL
 v8::MaybeLocal<v8::Array> GetClientHelloCiphers(
     Environment* env,
     const SSLPointer& ssl);
 
 bool SetGroups(SecureContext* sc, const char* groups);
+#endif
 
 const char* X509ErrorCode(long err);  // NOLINT(runtime/int)
 
