@@ -12,6 +12,7 @@
 
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
+#include <openssl/evp.h>
 
 namespace node {
 
@@ -212,7 +213,7 @@ WebCryptoCipherStatus RSA_Cipher(
   if (label_len > 0) {
     void* label = OPENSSL_memdup(params.label.get(), label_len);
     CHECK_NOT_NULL(label);
-    if (EVP_PKEY_CTX_set0_rsa_oaep_label(ctx.get(), label, label_len) <= 0) {
+    if (EVP_PKEY_CTX_set0_rsa_oaep_label(ctx.get(), (uint8_t *)label, label_len) <= 0) {
       OPENSSL_free(label);
       return WebCryptoCipherStatus::FAILED;
     }

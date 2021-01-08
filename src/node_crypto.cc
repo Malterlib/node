@@ -46,8 +46,12 @@ void Initialize(Local<Object> target,
 
   AES::Initialize(env, target);
   CipherBase::Initialize(env, target);
+#ifndef OPENSSL_NO_DH
   DiffieHellman::Initialize(env, target);
+#endif
+#ifndef OPENSSL_IS_BORINGSSL
   DSAAlg::Initialize(env, target);
+#endif
   ECDH::Initialize(env, target);
   Hash::Initialize(env, target);
   HKDFJob::Initialize(env, target);

@@ -298,7 +298,7 @@ void ECDH::SetPrivateKey(const FunctionCallbackInfo<Value>& args) {
     return THROW_ERR_CRYPTO_OPERATION_FAILED(env,
         "Failed to set generated public key");
 
-  EC_KEY_copy(ecdh->key_.get(), new_key.get());
+  ECKeyPointer(EC_KEY_dup(new_key.get()));
   ecdh->group_ = EC_KEY_get0_group(ecdh->key_.get());
 }
 

@@ -84,7 +84,7 @@ int SSL_CTX_use_certificate_chain(SSL_CTX* ctx,
     // the CA certificates.
     SSL_CTX_clear_extra_chain_certs(ctx);
 
-    for (int i = 0; i < sk_X509_num(extra_certs); i++) {
+    for (size_t i = 0; i < sk_X509_num(extra_certs); i++) {
       X509* ca = sk_X509_value(extra_certs, i);
 
       // NOTE: Increments reference count on `ca`
@@ -950,7 +950,7 @@ void SecureContext::LoadPKCS12(const FunctionCallbackInfo<Value>& args) {
                                     &sc->issuer_) &&
       SSL_CTX_use_PrivateKey(sc->ctx_.get(), pkey.get())) {
     // Add CA certs too
-    for (int i = 0; i < sk_X509_num(extra_certs.get()); i++) {
+    for (size_t i = 0; i < sk_X509_num(extra_certs.get()); i++) {
       X509* ca = sk_X509_value(extra_certs.get(), i);
 
       if (cert_store == root_cert_store) {

@@ -490,7 +490,9 @@ Maybe<bool> ExportJWKAsymmetricKey(
     case EVP_PKEY_RSA:
       // Fall through
     case EVP_PKEY_RSA_PSS: return ExportJWKRsaKey(env, key, target);
+#ifndef OPENSSL_IS_BORINGSSL
     case EVP_PKEY_DSA: return ExportJWKDsaKey(env, key, target);
+#endif
     case EVP_PKEY_EC: return ExportJWKEcKey(env, key, target);
   }
   THROW_ERR_CRYPTO_INVALID_KEYTYPE(env);
@@ -505,8 +507,10 @@ std::shared_ptr<KeyObjectData> ImportJWKAsymmetricKey(
     unsigned int offset) {
   if (strcmp(kty, "RSA") == 0) {
     return ImportJWKRsaKey(env, jwk, args, offset);
+#ifndef OPENSSL_IS_BORINGSSL
   } else if (strcmp(kty, "DSA") == 0) {
     return ImportJWKDsaKey(env, jwk, args, offset);
+#endif
   } else if (strcmp(kty, "EC") == 0) {
     return ImportJWKEcKey(env, jwk, args, offset);
   }
@@ -539,9 +543,13 @@ Maybe<bool> GetAsymmetricKeyDetail(
     case EVP_PKEY_RSA:
       // Fall through
     case EVP_PKEY_RSA_PSS: return GetRsaKeyDetail(env, key, target);
+#ifndef OPENSSL_IS_BORINGSSL
     case EVP_PKEY_DSA: return GetDsaKeyDetail(env, key, target);
+#endif
     case EVP_PKEY_EC: return GetEcKeyDetail(env, key, target);
+#ifndef OPENSSL_NO_DH
     case EVP_PKEY_DH: return GetDhKeyDetail(env, key, target);
+#endif
   }
   THROW_ERR_CRYPTO_INVALID_KEYTYPE(env);
   return Nothing<bool>();

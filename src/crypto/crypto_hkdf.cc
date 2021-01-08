@@ -101,6 +101,21 @@ bool HKDFTraits::DeriveBits(
     Environment* env,
     const HKDFConfig& params,
     ByteSource* out) {
+
+#ifdef OPENSSL_IS_BORINGSSL
+  size_t length = params.length;
+  char* data = MallocOpenSSL<char>(length);
+  ByteSource buf = ByteSource::Allocated(data, length);
+  unsigned char* ptr = reinterpret_cast<unsigned char*>(data);
+  if (HKDF(ptr, length, params.digest,
+                        (uint8_t const *)params.key->GetSymmetricKey(), params.key->GetSymmetricKeySize(),
+                        (uint8_t const *)params.salt.get(), params.salt.size(),
+                        (uint8_t const *)params.info.get(), params.info.size()) <= 0)
+    return false;
+
+  *out = std::move(buf);
+#else
+
   EVPKeyCtxPointer ctx =
       EVPKeyCtxPointer(EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, nullptr));
   if (!ctx ||
@@ -131,6 +146,7 @@ bool HKDFTraits::DeriveBits(
     return false;
 
   *out = std::move(buf);
+#endif
   return true;
 }
 

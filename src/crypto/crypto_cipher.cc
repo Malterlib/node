@@ -148,7 +148,7 @@ void GetCipherInfo(const FunctionCallbackInfo<Value>& args) {
   if (info->Set(
           env->context(),
           env->name_string(),
-          OneByteString(env->isolate(), EVP_CIPHER_name(cipher))).IsNothing()) {
+          OneByteString(env->isolate(), OBJ_nid2sn(EVP_CIPHER_nid(cipher)))).IsNothing()) {
     return;
   }
 
@@ -564,7 +564,7 @@ bool CipherBase::InitAuthenticated(
 
 bool CipherBase::CheckCCMMessageLength(int message_len) {
   CHECK(ctx_);
-  CHECK(EVP_CIPHER_CTX_mode(ctx_.get()) == EVP_CIPH_CCM_MODE);
+  CHECK(EVP_CIPHER_CTX_mode(ctx_.get()) == (uint32_t)EVP_CIPH_CCM_MODE);
 
   if (message_len > max_message_size_) {
     THROW_ERR_CRYPTO_INVALID_MESSAGELEN(env());

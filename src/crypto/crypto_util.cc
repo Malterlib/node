@@ -401,6 +401,41 @@ Maybe<bool> Decorate(Environment* env, Local<Object> obj,
         c = ToUpper(c);
     }
 
+#ifdef OPENSSL_IS_BORINGSSL
+#define OSSL_ERROR_CODES_MAP(V)                                               \
+    V(SYS)                                                                    \
+    V(BN)                                                                     \
+    V(RSA)                                                                    \
+    V(DH)                                                                     \
+    V(EVP)                                                                    \
+    V(BUF)                                                                    \
+    V(OBJ)                                                                    \
+    V(PEM)                                                                    \
+    V(DSA)                                                                    \
+    V(X509)                                                                   \
+    V(ASN1)                                                                   \
+    V(CONF)                                                                   \
+    V(CRYPTO)                                                                 \
+    V(EC)                                                                     \
+    V(SSL)                                                                    \
+    V(BIO)                                                                    \
+    V(PKCS7)                                                                  \
+    V(PKCS8)                                                                  \
+    V(X509V3)                                                                 \
+    V(RAND)                                                                   \
+    V(ENGINE)                                                                 \
+    V(OCSP)                                                                   \
+    V(UI)                                                                     \
+    V(COMP)                                                                   \
+    V(ECDSA)                                                                  \
+    V(ECDH)                                                                   \
+    V(HMAC)                                                                   \
+    V(DIGEST)                                                                 \
+    V(CIPHER)                                                                 \
+    V(HKDF)                                                                   \
+    V(USER)                                                                   \
+
+#else
 #define OSSL_ERROR_CODES_MAP(V)                                               \
     V(SYS)                                                                    \
     V(BN)                                                                     \
@@ -439,6 +474,8 @@ Maybe<bool> Decorate(Environment* env, Local<Object> obj,
     V(KDF)                                                                    \
     V(SM2)                                                                    \
     V(USER)                                                                   \
+
+#endif
 
 #define V(name) case ERR_LIB_##name: lib = #name "_"; break;
     const char* lib = "";

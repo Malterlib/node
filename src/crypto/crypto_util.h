@@ -15,13 +15,18 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/ec.h>
+#ifdef OPENSSL_IS_BORINGSSL
+#include <openssl/hkdf.h>
+#else
 #include <openssl/kdf.h>
+#endif
 #include <openssl/rsa.h>
 #include <openssl/dsa.h>
 #include <openssl/ssl.h>
 #ifndef OPENSSL_NO_ENGINE
 #  include <openssl/engine.h>
 #endif  // !OPENSSL_NO_ENGINE
+#include <openssl/rand.h>
 
 #include <algorithm>
 #include <memory>

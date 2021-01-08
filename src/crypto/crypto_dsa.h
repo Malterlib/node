@@ -1,7 +1,7 @@
 #ifndef SRC_CRYPTO_CRYPTO_DSA_H_
 #define SRC_CRYPTO_CRYPTO_DSA_H_
 
-#if defined(NODE_WANT_INTERNALS) && NODE_WANT_INTERNALS
+#if defined(NODE_WANT_INTERNALS) && NODE_WANT_INTERNALS && !defined(OPENSSL_IS_BORINGSSL)
 
 #include "crypto/crypto_keys.h"
 #include "crypto/crypto_keygen.h"

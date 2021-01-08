@@ -9,6 +9,8 @@
 #include "threadpoolwork-inl.h"
 #include "v8.h"
 
+#ifndef OPENSSL_NO_DH
+
 namespace node {
 
 using v8::ConstructorBehavior;
@@ -675,3 +677,5 @@ Maybe<bool> GetDhKeyDetail(
 
 }  // namespace crypto
 }  // namespace node
+
+#endif

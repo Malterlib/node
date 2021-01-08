@@ -73,9 +73,11 @@ const char* GetClientHelloServerName(const SSLPointer& ssl);
 
 const char* GetServerName(SSL* ssl);
 
+#ifndef OPENSSL_IS_BORINGSSL
 v8::MaybeLocal<v8::Array> GetClientHelloCiphers(
     Environment* env,
     const SSLPointer& ssl);
+#endif
 
 bool SetGroups(SecureContext* sc, const char* groups);
 

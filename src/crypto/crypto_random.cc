@@ -7,6 +7,8 @@
 #include "threadpoolwork-inl.h"
 #include "v8.h"
 
+#include <openssl/rand.h>
+
 namespace node {
 
 using v8::FunctionCallbackInfo;

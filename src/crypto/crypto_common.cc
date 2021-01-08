@@ -152,7 +152,7 @@ GetCertificateAltNames(X509* cert) {
   if (names == nullptr)  // There are no names
     return map;
 
-  for (int i = 0; i < sk_GENERAL_NAME_num(names); i++) {
+  for (size_t i = 0; i < sk_GENERAL_NAME_num(names); i++) {
     USE(BIO_reset(bio.get()));
     GENERAL_NAME* gen = sk_GENERAL_NAME_value(names, i);
     if (gen->type == GEN_DNS) {
@@ -413,7 +413,7 @@ StackOfX509 CloneSSLCerts(X509Pointer&& cert,
   StackOfX509 peer_certs(sk_X509_new(nullptr));
   if (cert)
     sk_X509_push(peer_certs.get(), cert.release());
-  for (int i = 0; i < sk_X509_num(ssl_certs); i++) {
+  for (size_t i = 0; i < sk_X509_num(ssl_certs); i++) {
     X509Pointer cert(X509_dup(sk_X509_value(ssl_certs, i)));
     if (!cert || !sk_X509_push(peer_certs.get(), cert.get()))
       return StackOfX509();
@@ -431,7 +431,7 @@ MaybeLocal<Object> AddIssuerChainToObject(
   Local<Context> context = env->isolate()->GetCurrentContext();
   cert->reset(sk_X509_delete(peer_certs.get(), 0));
   for (;;) {
-    int i;
+    size_t i;
     for (i = 0; i < sk_X509_num(peer_certs.get()); i++) {
       X509* ca = sk_X509_value(peer_certs.get(), i);
       if (X509_check_issued(ca, cert->get()) != X509_V_OK)
@@ -562,7 +562,7 @@ bool SafeX509ExtPrint(const BIOPointer& out, X509_EXTENSION* ext) {
   if (names == nullptr)
     return false;
 
-  for (int i = 0; i < sk_GENERAL_NAME_num(names); i++) {
+  for (size_t i = 0; i < sk_GENERAL_NAME_num(names); i++) {
     GENERAL_NAME* gen = sk_GENERAL_NAME_value(names, i);
 
     if (i != 0)
@@ -769,6 +769,9 @@ MaybeLocal<Array> GetClientHelloCiphers(
     Environment* env,
     const SSLPointer& ssl) {
   EscapableHandleScope scope(env->isolate());
+#ifdef OPENSSL_IS_BORINGSSL
+  return MaybeLocal<Array>();
+#else
   const unsigned char* buf;
   size_t len = SSL_client_hello_get0_ciphers(ssl.get(), &buf);
   size_t count = len / 2;
@@ -796,8 +799,8 @@ MaybeLocal<Array> GetClientHelloCiphers(
   }
   Local<Array> ret = Array::New(env->isolate(), ciphers.out(), count);
   return scope.Escape(ret);
+#endif
 }
-
 
 MaybeLocal<Object> GetCipherInfo(Environment* env, const SSLPointer& ssl) {
   if (SSL_get_current_cipher(ssl.get()) == nullptr)

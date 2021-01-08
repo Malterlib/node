@@ -7,6 +7,8 @@
 #include "threadpoolwork-inl.h"
 #include "v8.h"
 
+#if !defined(OPENSSL_IS_BORINGSSL)
+
 #include <openssl/bn.h>
 #include <openssl/dsa.h>
 
@@ -270,3 +272,4 @@ void Initialize(Environment* env, Local<Object> target) {
 }  // namespace crypto
 }  // namespace node
 
+#endif
