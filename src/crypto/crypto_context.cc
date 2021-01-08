@@ -724,6 +724,122 @@ void SecureContext::SetCiphers(const FunctionCallbackInfo<Value>& args) {
   }
 }
 
+static void set_settings_from_certificate(Environment* env, SSL_CTX* const context) {
+    int curveName = 0;
+
+    auto privateKey = SSL_CTX_get0_privatekey(context);
+    if (privateKey) {
+        if (auto keyRSA = EVP_PKEY_get1_RSA(privateKey)) {
+            auto RSASize = RSA_size(keyRSA) * 8;
+            RSA_free(keyRSA);
+            // Match curve security to security of RSA key
+            if (RSASize >= 12288)
+                curveName = NID_secp521r1;
+            else if (RSASize >= 4096)
+                curveName = NID_secp384r1;
+            else
+                curveName = NID_X9_62_prime256v1;
+        } else if (auto keyEC = EVP_PKEY_get1_EC_KEY(privateKey)) {
+            curveName = EC_GROUP_get_curve_name(EC_KEY_get0_group(keyEC));
+            if (!curveName)
+                curveName = NID_secp521r1;
+            EC_KEY_free(keyEC);
+        }
+    }
+
+    if (curveName) {
+        EC_KEY *curveKey = EC_KEY_new_by_curve_name(curveName);
+        if (curveKey) {
+            SSL_CTX_set_options(context, SSL_OP_SINGLE_ECDH_USE);
+            if (SSL_CTX_set_tmp_ecdh(context, curveKey) != 1)
+                SSL_CTX_set_ecdh_auto(context, 1);
+            EC_KEY_free(curveKey);
+        } else
+            SSL_CTX_set_ecdh_auto(context, 1);
+    }
+
+    static const int supportedCurves[] = {
+        NID_secp521r1
+        , NID_secp384r1
+#ifdef OPENSSL_IS_BORINGSSL
+        , NID_X25519
+#endif
+        , NID_X9_62_prime256v1
+    };
+
+    if (!SSL_CTX_set1_curves(context, supportedCurves, sizeof(supportedCurves)
+        / sizeof(supportedCurves[0]))) {
+        return THROW_ERR_CRYPTO_OPERATION_FAILED(env, "Failed to set supported curves on ssl context");
+    }
+
+#ifdef OPENSSL_IS_BORINGSSL
+    static const uint16_t s_DefaultAlgos[] = {
+        SSL_SIGN_ECDSA_SECP521R1_SHA512
+        , SSL_SIGN_RSA_PSS_SHA512
+        , SSL_SIGN_RSA_PKCS1_SHA512
+        , SSL_SIGN_ECDSA_SECP384R1_SHA384
+        , SSL_SIGN_RSA_PSS_SHA384
+        , SSL_SIGN_RSA_PKCS1_SHA384
+        , SSL_SIGN_ECDSA_SECP256R1_SHA256
+        , SSL_SIGN_RSA_PSS_SHA256
+        , SSL_SIGN_RSA_PKCS1_SHA256
+    };
+
+    size_t num_algos = sizeof(s_DefaultAlgos) / sizeof(s_DefaultAlgos[0]);
+    const uint16_t *algos = s_DefaultAlgos;
+
+    switch (curveName)
+    {
+    case NID_secp521r1: break;
+    case NID_secp384r1:
+        {
+            static const uint16_t s_CustomAlgos[] =
+            {
+                SSL_SIGN_ECDSA_SECP384R1_SHA384
+                , SSL_SIGN_RSA_PSS_SHA384
+                , SSL_SIGN_RSA_PKCS1_SHA384
+                , SSL_SIGN_ECDSA_SECP521R1_SHA512
+                , SSL_SIGN_RSA_PSS_SHA512
+                , SSL_SIGN_RSA_PKCS1_SHA512
+                , SSL_SIGN_ECDSA_SECP256R1_SHA256
+                , SSL_SIGN_RSA_PSS_SHA256
+                , SSL_SIGN_RSA_PKCS1_SHA256
+            };
+            num_algos = sizeof(s_CustomAlgos) / sizeof(s_CustomAlgos[0]);
+            algos = s_CustomAlgos;
+        }
+        break;
+    case NID_X9_62_prime256v1:
+    case NID_X25519:
+        {
+            static const uint16_t s_CustomAlgos[] =
+            {
+                SSL_SIGN_ECDSA_SECP256R1_SHA256
+                , SSL_SIGN_RSA_PSS_SHA256
+                , SSL_SIGN_RSA_PKCS1_SHA256
+                , SSL_SIGN_ECDSA_SECP384R1_SHA384
+                , SSL_SIGN_RSA_PSS_SHA384
+                , SSL_SIGN_RSA_PKCS1_SHA384
+                , SSL_SIGN_ECDSA_SECP521R1_SHA512
+                , SSL_SIGN_RSA_PSS_SHA512
+                , SSL_SIGN_RSA_PKCS1_SHA512
+            };
+            num_algos = sizeof(s_CustomAlgos) / sizeof(s_CustomAlgos[0]);
+            algos = s_CustomAlgos;
+        }
+        break;
+    }
+
+    if (!SSL_CTX_set_signing_algorithm_prefs(context, algos, num_algos)) {
+        return THROW_ERR_CRYPTO_OPERATION_FAILED(env, "Failed to set preferred signing algorithms on ssl context");
+    }
+
+    if (!SSL_CTX_set_verify_algorithm_prefs(context, algos, num_algos)) {
+        return THROW_ERR_CRYPTO_OPERATION_FAILED(env, "Failed to set preferred verify algorithms on ssl context");
+    }
+#endif
+}
+
 void SecureContext::SetECDHCurve(const FunctionCallbackInfo<Value>& args) {
   SecureContext* sc;
   ASSIGN_OR_RETURN_UNWRAP(&sc, args.Holder());
@@ -733,6 +849,9 @@ void SecureContext::SetECDHCurve(const FunctionCallbackInfo<Value>& args) {
   CHECK(args[0]->IsString());
 
   Utf8Value curve(env->isolate(), args[0]);
+
+  if (strcmp(*curve, "from_certificate") == 0)
+    return set_settings_from_certificate(env, sc->ctx_.get());
 
   if (strcmp(*curve, "auto") != 0 &&
       !SSL_CTX_set1_curves_list(sc->ctx_.get(), *curve)) {
