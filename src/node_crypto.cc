@@ -1381,11 +1381,9 @@ void SecureContext::SetECDHCurve(const FunctionCallbackInfo<Value>& args) {
 
   node::Utf8Value curve(env->isolate(), args[0]);
 
-  if (strcmp(*curve, "from_certificate") == 0)
+  if (strcmp(*curve, "auto") == 0) {
     return set_settings_from_certificate(env, sc->ctx_.get());
-
-  if (strcmp(*curve, "auto") == 0)
-    return;
+  }
 
   if (!SSL_CTX_set1_curves_list(sc->ctx_.get(), *curve))
     return env->ThrowError("Failed to set ECDH curve");
