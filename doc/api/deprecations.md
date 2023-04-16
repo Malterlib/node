@@ -2072,6 +2072,9 @@ Type: Documentation-only (supports [`--pending-deprecation`][])
 
 `process.binding()` is for use by Node.js internal code only.
 
+While `process.binding()` has not reached End-of-Life status in general, it is
+unavailable when [policies][] are enabled.
+
 ### DEP0112: `dgram` private APIs
 <!-- YAML
 changes:
@@ -2794,4 +2797,5 @@ an explicit [`"exports"` or `"main"` entry][] with the exact file extension.
 [from_arraybuffer]: buffer.md#buffer_static_method_buffer_from_arraybuffer_byteoffset_length
 [from_string_encoding]: buffer.md#buffer_static_method_buffer_from_string_encoding
 [legacy `urlObject`]: url.md#url_legacy_urlobject
+[policies]: permissions.md#policies
 [static methods of `crypto.Certificate()`]: crypto.md#crypto_class_certificate
