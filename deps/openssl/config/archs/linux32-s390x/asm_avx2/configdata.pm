@@ -60,7 +60,7 @@ our %config = (
   openssl_thread_defines => [ "OPENSSL_THREADS" ],
   openssldir => "",
   options => "enable-ssl-trace no-afalgeng no-asan no-buildtest-c++ no-comp no-crypto-mdebug no-crypto-mdebug-backtrace no-devcryptoeng no-dynamic-engine no-ec_nistp_64_gcc_128 no-egd no-external-tests no-fuzz-afl no-fuzz-libfuzzer no-heartbeats no-md2 no-msan no-rc5 no-sctp no-shared no-ssl3 no-ssl3-method no-ubsan no-unit-test no-weak-ssl-ciphers no-zlib no-zlib-dynamic",
-  perl_archname => "x86_64-linux-gnu-thread-multi",
+  perl_archname => "aarch64-linux-gnu-thread-multi",
   perl_cmd => "/usr/bin/perl",
   perl_version => "5.30.0",
   perlargv => [ "no-comp", "no-shared", "no-afalgeng", "enable-ssl-trace", "linux32-s390x" ],
@@ -111,8 +111,8 @@ our %config = (
   sourcedir => ".",
   target => "linux32-s390x",
   tdirs => [ "ossl_shim" ],
-  version => "1.1.1t",
-  version_num => "0x1010114fL",
+  version => "1.1.1u",
+  version_num => "0x1010115fL",
 );
 
 our %target = (
@@ -1955,7 +1955,6 @@ our %unified_info = (
                             "crypto/bn/bn_srp.o",
                             "crypto/bn/bn_word.o",
                             "crypto/bn/bn_x931p.o",
-                            "crypto/bn/rsa_sup_mul.o",
                             "crypto/bn/s390x-gf2m.o",
                             "crypto/bn/s390x-mont.o",
                         ],
@@ -5630,11 +5629,6 @@ our %unified_info = (
             "crypto/bn/mips-mont.o" =>
                 [
                     "crypto",
-                ],
-            "crypto/bn/rsa_sup_mul.o" =>
-                [
-                    ".",
-                    "include",
                 ],
             "crypto/bn/s390x-gf2m.o" =>
                 [
@@ -10521,10 +10515,6 @@ our %unified_info = (
                 [
                     "crypto/bn/bn_x931p.c",
                 ],
-            "crypto/bn/rsa_sup_mul.o" =>
-                [
-                    "crypto/bn/rsa_sup_mul.c",
-                ],
             "crypto/bn/s390x-gf2m.o" =>
                 [
                     "crypto/bn/s390x-gf2m.s",
@@ -12775,7 +12765,6 @@ our %unified_info = (
                     "crypto/bn/bn_srp.o",
                     "crypto/bn/bn_word.o",
                     "crypto/bn/bn_x931p.o",
-                    "crypto/bn/rsa_sup_mul.o",
                     "crypto/bn/s390x-gf2m.o",
                     "crypto/bn/s390x-mont.o",
                     "crypto/buffer/buf_err.o",
