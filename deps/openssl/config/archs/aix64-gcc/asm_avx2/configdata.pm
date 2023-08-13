@@ -110,8 +110,8 @@ our %config = (
   sourcedir => ".",
   target => "aix64-gcc",
   tdirs => [ "ossl_shim" ],
-  version => "1.1.1u",
-  version_num => "0x1010115fL",
+  version => "1.1.1v",
+  version_num => "0x1010116fL",
 );
 
 our %target = (
