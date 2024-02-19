@@ -5295,6 +5295,7 @@ void PublicKeyCipher::Cipher(const FunctionCallbackInfo<Value>& args) {
       return ThrowCryptoError(env, ERR_get_error());
     }
 
+#ifndef OPENSSL_IS_BORINGSSL
     int rsa_pkcs1_implicit_rejection =
         EVP_PKEY_CTX_ctrl_str(ctx.get(), "rsa_pkcs1_implicit_rejection", "1");
     // From the doc -2 means that the option is not supported.
@@ -5305,11 +5306,14 @@ void PublicKeyCipher::Cipher(const FunctionCallbackInfo<Value>& args) {
     // will not affect what is used since a different context is
     // used in the call if the option is supported
     if (rsa_pkcs1_implicit_rejection <= 0) {
+#endif
       return THROW_ERR_INVALID_ARG_VALUE(
           env,
           "RSA_PKCS1_PADDING is no longer supported for private decryption,"
           " this can be reverted with --security-revert=CVE-2023-46809");
+#ifndef OPENSSL_IS_BORINGSSL
     }
+#endif
   }
 
   const node::Utf8Value oaep_str(env->isolate(), args[offset + 2]);

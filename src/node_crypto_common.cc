@@ -516,7 +516,7 @@ bool SafeX509ExtPrint(const BIOPointer& out, X509_EXTENSION* ext) {
         sk_GENERAL_NAME_pop_free(names, GENERAL_NAME_free);
         return false;
       }
-      X509V3_EXT_val_prn(out.get(), nval, 0, 0);
+      //X509V3_EXT_val_prn(out.get(), nval, 0, 0);
       sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
     }
   }

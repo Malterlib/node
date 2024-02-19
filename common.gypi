@@ -380,7 +380,7 @@
         'ldflags': [ '-pthread' ],
       }],
       [ 'OS in "linux freebsd openbsd solaris android aix cloudabi"', {
-        'cflags': [ '-Wall', '-Wextra', '-Wno-unused-parameter', ],
+        'cflags': [ '-Wall', '-Wextra', '-Wno-unused-parameter', '-Wno-enum-constexpr-conversion' ],
         'cflags_cc': [ '-fno-rtti', '-fno-exceptions', '-std=gnu++1y' ],
         'defines': [ '__STDC_FORMAT_MACROS' ],
         'ldflags': [ '-rdynamic' ],
@@ -496,6 +496,7 @@
             '-Wendif-labels',
             '-W',
             '-Wno-unused-parameter',
+            '-Wno-enum-constexpr-conversion',
           ],
         },
         'target_conditions': [
