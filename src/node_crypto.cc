@@ -1277,29 +1277,34 @@ static void set_settings_from_certificate(Environment* env, SSL_CTX* const conte
         }
     }
 
+    bool setCurves = false;
     if (curveName) {
         EC_KEY *curveKey = EC_KEY_new_by_curve_name(curveName);
         if (curveKey) {
             SSL_CTX_set_options(context, SSL_OP_SINGLE_ECDH_USE);
             if (SSL_CTX_set_tmp_ecdh(context, curveKey) != 1)
                 SSL_CTX_set_ecdh_auto(context, 1);
+            else
+              setCurves = true;
             EC_KEY_free(curveKey);
         } else
             SSL_CTX_set_ecdh_auto(context, 1);
     }
 
-    static const int supportedCurves[] = {
-        NID_secp521r1
-        , NID_secp384r1
-#ifdef OPENSSL_IS_BORINGSSL
-        , NID_X25519
-#endif
-        , NID_X9_62_prime256v1
-    };
+    if (!setCurves) {
+      static const int supportedCurves[] = {
+          NID_secp521r1
+          , NID_secp384r1
+  #ifdef OPENSSL_IS_BORINGSSL
+          , NID_X25519
+  #endif
+          , NID_X9_62_prime256v1
+      };
 
-    if (!SSL_CTX_set1_curves(context, supportedCurves, sizeof(supportedCurves)
-        / sizeof(supportedCurves[0]))) {
-        return env->ThrowError("Failed to set supported curves on ssl context");
+      if (!SSL_CTX_set1_curves(context, supportedCurves, sizeof(supportedCurves)
+          / sizeof(supportedCurves[0]))) {
+          return env->ThrowError("Failed to set supported curves on ssl context");
+      }
     }
 
 #ifdef OPENSSL_IS_BORINGSSL
