@@ -33,6 +33,8 @@
 #include "stream_base-inl.h"
 #include "util-inl.h"
 
+#include <stdio.h>
+
 namespace node {
 
 using crypto::SecureContext;
@@ -266,6 +268,9 @@ void TLSWrap::SSLInfoCallback(const SSL* ssl_, int where, int ret) {
   // sending HelloRequest in OpenSSL-1.1.1.
   // We need to check whether this is in a renegotiation state or not.
   if (where & SSL_CB_HANDSHAKE_DONE && !SSL_renegotiate_pending(ssl)) {
+    int curve = SSL_get_negotiated_group(ssl);
+    const char *curve_name = OBJ_nid2sn(curve & 0x0000FFFF);
+    printf("Negotiated curve %d: %s\n", curve, curve_name);
     Debug(c, "SSLInfoCallback(SSL_CB_HANDSHAKE_DONE);");
     CHECK(!SSL_renegotiate_pending(ssl));
     Local<Value> callback;
