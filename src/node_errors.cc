@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cerrno>
 #include <cstdarg>
 
@@ -27,11 +28,46 @@ using v8::MaybeLocal;
 using v8::Message;
 using v8::Object;
 using v8::ScriptOrigin;
+using v8::EscapableHandleScope;
 using v8::StackFrame;
 using v8::StackTrace;
 using v8::String;
 using v8::Undefined;
 using v8::Value;
+
+static std::atomic<bool> is_in_oom{false};
+static thread_local std::atomic<bool> is_retrieving_js_stacktrace{false};
+
+MaybeLocal<StackTrace> GetCurrentStackTrace(Isolate* isolate, int frame_count) {
+  if (isolate == nullptr) {
+    return MaybeLocal<StackTrace>();
+  }
+  // Generating JavaScript stack trace can result in V8 fatal error,
+  // which can re-enter this function.
+  if (is_retrieving_js_stacktrace.load()) {
+    return MaybeLocal<StackTrace>();
+  }
+
+  // Can not capture the stacktrace when the isolate is in a OOM state or no
+  // context is entered.
+  if (is_in_oom.load() || !isolate->InContext()) {
+    return MaybeLocal<StackTrace>();
+  }
+
+  constexpr StackTrace::StackTraceOptions options =
+      static_cast<StackTrace::StackTraceOptions>(
+          StackTrace::kDetailed |
+          StackTrace::kExposeFramesAcrossSecurityOrigins);
+
+  is_retrieving_js_stacktrace.store(true);
+  EscapableHandleScope scope(isolate);
+  Local<StackTrace> stack =
+      StackTrace::CurrentStackTrace(isolate, frame_count, options);
+
+  is_retrieving_js_stacktrace.store(false);
+
+  return scope.Escape(stack);
+}
 
 bool IsExceptionDecorated(Environment* env, Local<Value> er) {
   if (!er.IsEmpty() && er->IsObject()) {
@@ -443,13 +479,52 @@ void OnFatalError(const char* location, const char* message) {
   ABORT();
 }
 
+// Check if an exception is a stack overflow error (RangeError with
+// "Maximum call stack size exceeded" message). This is used to handle
+// stack overflow specially in TryCatchScope - instead of immediately
+// exiting, we can use the red zone to re-throw to user code.
+static bool IsStackOverflowError(Isolate* isolate, Local<Value> exception) {
+  if (!exception->IsNativeError()) return false;
+
+  Local<Object> err_obj = exception.As<Object>();
+  Local<String> constructor_name = err_obj->GetConstructorName();
+
+  // Must be a RangeError
+  Utf8Value name(isolate, constructor_name);
+  if (strcmp(*name, "RangeError") != 0) return false;
+
+  // Check for the specific stack overflow message
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Value> message_val;
+  if (!err_obj->Get(context, String::NewFromUtf8Literal(isolate, "message"))
+           .ToLocal(&message_val)) {
+    return false;
+  }
+
+  if (!message_val->IsString()) return false;
+
+  Utf8Value message(isolate, message_val.As<String>());
+  return strcmp(*message, "Maximum call stack size exceeded") == 0;
+}
+
 namespace errors {
 
 TryCatchScope::~TryCatchScope() {
-  if (HasCaught() && !HasTerminated() && mode_ == CatchMode::kFatal) {
+  if (HasCaught() && !HasTerminated() && mode_ != CatchMode::kNormal) {
     HandleScope scope(env_->isolate());
     Local<v8::Value> exception = Exception();
     Local<v8::Message> message = Message();
+
+    // Special handling for stack overflow errors in async_hooks: instead of
+    // immediately exiting, re-throw the exception. This allows the exception
+    // to propagate to user code's try-catch blocks.
+    if (mode_ == CatchMode::kFatalRethrowStackOverflow &&
+        IsStackOverflowError(env_->isolate(), exception)) {
+      ReThrow();
+      Reset();
+      return;
+    }
+
     EnhanceFatalException enhance = CanContinue() ?
         EnhanceFatalException::kEnhance : EnhanceFatalException::kDontEnhance;
     if (message.IsEmpty())
@@ -953,8 +1028,24 @@ void TriggerUncaughtException(Isolate* isolate,
   if (env->can_call_into_js()) {
     // We do not expect the global uncaught exception itself to throw any more
     // exceptions. If it does, exit the current Node.js instance.
-    errors::TryCatchScope try_catch(env,
-                                    errors::TryCatchScope::CatchMode::kFatal);
+    // Special case: if the original error was a stack overflow and calling
+    // _fatalException causes another stack overflow, rethrow it to allow
+    // user code's try-catch blocks to potentially catch it.
+    auto is_stack_overflow = [&] {
+      return IsStackOverflowError(env->isolate(), error);
+    };
+    // Without a JS stack, rethrowing may or may not do anything.
+    auto has_js_stack = [&] {
+      HandleScope handle_scope(env->isolate());
+      Local<StackTrace> stack;
+      return GetCurrentStackTrace(env->isolate(), 1).ToLocal(&stack) &&
+             stack->GetFrameCount() > 0;
+    };
+    errors::TryCatchScope::CatchMode mode =
+        is_stack_overflow() && has_js_stack()
+            ? errors::TryCatchScope::CatchMode::kFatalRethrowStackOverflow
+            : errors::TryCatchScope::CatchMode::kFatal;
+    errors::TryCatchScope try_catch(env, mode);
     // Explicitly disable verbose exception reporting -
     // if process._fatalException() throws an error, we don't want it to
     // trigger the per-isolate message listener which will call this
