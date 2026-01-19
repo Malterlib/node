@@ -32,8 +32,9 @@
 #include "util-inl.h"
 #include "v8.h"
 
-#include <cstring>
 #include <climits>
+#include <cstring>
+#include <limits>
 
 #define THROW_AND_RETURN_UNLESS_BUFFER(env, obj)                            \
   THROW_AND_RETURN_IF_NOT_BUFFER(env, obj, "argument")                      \
@@ -1129,6 +1130,50 @@ void SetBufferPrototype(const FunctionCallbackInfo<Value>& args) {
 }
 
 
+// Converts a number parameter to size_t suitable for ArrayBuffer sizes
+// Could be larger than uint32_t
+// See v8::internal::TryNumberToSize and v8::internal::NumberToSize
+inline size_t CheckNumberToSize(Local<Value> number) {
+  CHECK(number->IsNumber());
+  double value = number.As<Number>()->Value();
+  // See v8::internal::TryNumberToSize on this (and on < comparison)
+  double maxSize = static_cast<double>(std::numeric_limits<size_t>::max());
+  CHECK(value >= 0 && value < maxSize);
+  return static_cast<size_t>(value);
+}
+
+// Creates an ArrayBuffer with uninitialized memory, bypassing the zero-fill
+// toggle mechanism. This is used by Buffer.allocUnsafe and Buffer.allocUnsafeSlow.
+// CVE-2025-55131: The zero-fill toggle mechanism was vulnerable to race conditions.
+void CreateUnsafeArrayBuffer(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+  if (args.Length() != 1) {
+    return env->ThrowRangeError("Invalid array buffer length");
+  }
+
+  size_t size = CheckNumberToSize(args[0]);
+
+  Isolate* isolate = env->isolate();
+
+  Local<ArrayBuffer> buf;
+
+  NodeArrayBufferAllocator* allocator = env->isolate_data()->node_allocator();
+  // 0-length, or zero-fill flag is set, or no allocator available
+  if (size == 0 || per_process::cli_options->zero_fill_all_buffers ||
+      allocator == nullptr) {
+    buf = ArrayBuffer::New(isolate, size);
+  } else {
+    std::unique_ptr<BackingStore> store =
+        ArrayBuffer::NewBackingStoreForNodeLTS(isolate, size);
+    if (!store) {
+      return env->ThrowRangeError("Array buffer allocation failed");
+    }
+    buf = ArrayBuffer::New(isolate, std::move(store));
+  }
+
+  args.GetReturnValue().Set(buf);
+}
+
 void Initialize(Local<Object> target,
                 Local<Value> unused,
                 Local<Context> context,
@@ -1136,6 +1181,8 @@ void Initialize(Local<Object> target,
   Environment* env = Environment::GetCurrent(context);
 
   env->SetMethod(target, "setBufferPrototype", SetBufferPrototype);
+  env->SetMethodNoSideEffect(target, "createUnsafeArrayBuffer",
+                             CreateUnsafeArrayBuffer);
   env->SetMethodNoSideEffect(target, "createFromString", CreateFromString);
 
   env->SetMethodNoSideEffect(target, "byteLengthUtf8", ByteLengthUtf8);
@@ -1179,29 +1226,6 @@ void Initialize(Local<Object> target,
   env->SetMethod(target, "utf8Write", StringWrite<UTF8>);
 
   Blob::Initialize(env, target);
-
-  // It can be a nullptr when running inside an isolate where we
-  // do not own the ArrayBuffer allocator.
-  if (NodeArrayBufferAllocator* allocator =
-          env->isolate_data()->node_allocator()) {
-    uint32_t* zero_fill_field = allocator->zero_fill_field();
-    std::unique_ptr<BackingStore> backing =
-      ArrayBuffer::NewBackingStore(zero_fill_field,
-                                   sizeof(*zero_fill_field),
-                                   [](void*, size_t, void*){},
-                                   nullptr);
-    Local<ArrayBuffer> array_buffer =
-        ArrayBuffer::New(env->isolate(), std::move(backing));
-    array_buffer->SetPrivate(
-        env->context(),
-        env->untransferable_object_private_symbol(),
-        True(env->isolate())).Check();
-    CHECK(target
-              ->Set(env->context(),
-                    FIXED_ONE_BYTE_STRING(env->isolate(), "zeroFill"),
-                    Uint32Array::New(array_buffer, 0, 1))
-              .FromJust());
-  }
 }
 
 }  // anonymous namespace
