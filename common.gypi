@@ -564,6 +564,12 @@
           'OPENSSL_NO_ASM',
         ],
       }],
+      # Disable C++ features in BoringSSL headers
+      ['1==1', {
+        'defines': [
+          'BORINGSSL_NO_CXX',
+        ],
+      }],
     ],
   }
 }
